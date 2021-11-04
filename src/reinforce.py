@@ -70,6 +70,7 @@ def reinforce(env, policy_model, seed, learning_rate,
     random.seed(seed)
     policy = []
     env.seed(seed)
+    allScores = []
     for episode in range(number_episodes):
         state = env.reset()['glyphs']
         logProbs = []
@@ -101,19 +102,20 @@ def reinforce(env, policy_model, seed, learning_rate,
                 #back propagation
                 policyGrad.backward()
                 policy_model.optimizer.step()
+                allScores.append(sum(scores) / len(scores))
                 break
             state = nextState['glyphs']
-    return policy, scores
+    return policy, allScores
 
 def run_reinforce():
-    env = gym.make('MiniHack-Quest-Hard-v0',observation_keys=("glyphs", "chars", "colors", "pixel","screen_descriptions"),)
+    env = gym.make("MiniHack-Quest-Easy-v0",observation_keys=("glyphs", "chars", "colors", "pixel","screen_descriptions"),)
     #print(env.observation_space['glyphs'])
     #deimension of game space
     size = 21 * 79
     policy_model = SimplePolicy(s_size=size, h_size=128, a_size=env.action_space.n)
     policy, scores = reinforce(env=env, policy_model=policy_model, seed=42, learning_rate=1e-2,
-                               number_episodes=10,
-                               max_episode_length=100000,
+                               number_episodes=50,
+                               max_episode_length=10000,
                                gamma=0.9,
                                verbose=True)
     # Plot learning curve
@@ -122,6 +124,9 @@ def run_reinforce():
     #max_episode_length=1000
     #h_size=50
     plt.plot(scores,'o')
+    plt.xlabel('Episodes')
+    plt.ylabel('Average reward')
+    plt.title('Average reward per episode')
     plt.show()
 
 
