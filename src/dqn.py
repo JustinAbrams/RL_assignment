@@ -231,29 +231,34 @@ if __name__ == "__main__":
         "eps-start": 1.0,  # e-greedy start threshold
         "eps-end": 0.01,  # e-greedy end threshold
         "eps-fraction": 0.1,  # fraction of num-steps
-        "print-freq": 25,
-        "save-freq": 500,
+        "print-freq": 25, # number of iterations between each print out
+        "save-freq": 500, # number of iterations between each model save
     }
 
     np.random.seed(hyper_params["seed"])
     random.seed(hyper_params["seed"])
 
-    # ACTIONS
+    # ACTIONS define the actions allowed by the agent
     MOVE_ACTIONS = tuple(nethack.CompassDirection)
     NAVIGATE_ACTIONS = MOVE_ACTIONS + (
-        nethack.Command.OPEN,
-        nethack.Command.KICK,
-        nethack.Command.SEARCH,
-        nethack.Command.JUMP,
-        nethack.Command.LOOK,
-        nethack.Command.LOOT,
-        nethack.Command.PICKUP,
-        nethack.Command.PRAY,
-        nethack.Command.WEAR,
-        nethack.Command.WIELD,
-        nethack.Command.UNTRAP,
+        nethack.Command.OPEN,   # Not sure if needed
+        nethack.Command.KICK,   # Not sure if needed
+        nethack.Command.SEARCH, # Not sure if needed
+        nethack.Command.JUMP,   # Not sure if needed
+        nethack.Command.LOOK,   # Not sure if needed
+        nethack.Command.LOOT,   # Not sure if needed
+        nethack.Command.PICKUP, # Not sure if needed
+        nethack.Command.PRAY,   # Not sure if needed
+        nethack.Command.WEAR,   # Not sure if needed
+        nethack.Command.WIELD,  # Not sure if needed
+        nethack.Command.UNTRAP, # Not sure if needed
+        
+        # Might need more? All actions and descriptions found here
+        # https://minihack.readthedocs.io/en/latest/getting-started/action_spaces.html
     )
 
+    # Create env with modified actions
+    # Probably can limit the observations as well
     env = gym.make(
         "MiniHack-Quest-Easy-v0",
         actions=NAVIGATE_ACTIONS
@@ -266,6 +271,7 @@ if __name__ == "__main__":
 
     replay_buffer = ReplayBuffer(hyper_params["replay-buffer-size"])
 
+    # Glyphs are 21 by 79
     input_size = 1659 # 21 * 79
 
     agent = DQNAgent(
