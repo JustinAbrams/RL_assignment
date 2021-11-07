@@ -216,6 +216,7 @@ import random
 import numpy as np
 import gym
 import minihack
+from minihack import RewardManager
 from nle import nethack
 import argparse
 import time
@@ -319,20 +320,23 @@ def create_env():
     MOVE_ACTIONS = tuple(nethack.CompassDirection)
     NAVIGATE_ACTIONS = MOVE_ACTIONS + (
         nethack.Command.OPEN,   # Not sure if needed
-        nethack.Command.KICK,   # Not sure if needed
-        nethack.Command.SEARCH, # Not sure if needed
-        nethack.Command.JUMP,   # Not sure if needed
-        nethack.Command.LOOK,   # Not sure if needed
-        nethack.Command.LOOT,   # Not sure if needed
         nethack.Command.PICKUP, # Not sure if needed
-        nethack.Command.PRAY,   # Not sure if needed
         nethack.Command.WEAR,   # Not sure if needed
         nethack.Command.WIELD,  # Not sure if needed
-        nethack.Command.UNTRAP, # Not sure if needed
+        nethack.Command.QUAFF,
+        nethack.Command.INVOKE,
+        nethack.Command.ZAP,
+        nethack.Command.SWAP,
 
         # Might need more? All actions and descriptions found here
         # https://minihack.readthedocs.io/en/latest/getting-started/action_spaces.html
     )
+
+    # rewards = RewardManager()
+    # rewards.add_kill_event("minotaur", reward=5, terminal_required=False)
+    # strings = list()
+    # strings.append("The door opens.")
+    # rewards.add_message_event(strings, reward=2, terminal_required=False)
 
     # Create env with modified actions
     # Probably can limit the observations as well
@@ -340,7 +344,8 @@ def create_env():
         hyper_params["env-name"],
         actions=NAVIGATE_ACTIONS,
         reward_lose=-2,
-        reward_win=2
+        reward_win=2,
+        # reward_manager=rewards
     )
     env.seed(hyper_params["seed"])
     return env
