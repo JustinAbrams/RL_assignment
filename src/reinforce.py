@@ -11,14 +11,14 @@ import torch.nn.functional as Func
 import random
 from torch.autograd import Variable
 from collections import deque
-
+from nle import nethack
 #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 class SimplePolicy(nn.Module):
     def __init__(self, s_size, h_size, a_size):
         super(SimplePolicy, self).__init__()
-        learning_rate = 3e-4
+        learning_rate = 0.00005
         self.linear1 = nn.Linear(s_size, h_size)
         self.linear2 = nn.Linear(h_size, a_size)
         self.optimizer = torch.optim.Adam(self.parameters(), lr=learning_rate)
@@ -55,7 +55,7 @@ def compute_returns(rewards, gamma):
     #convert returns to tensor
     returns = torch.tensor(returns)
     #normalize returns
-    returns = (returns - returns.mean()) / (returns.std() + 1e-9)
+    returns = (returns - returns.mean()) / (returns.std())
     return returns
 
 
@@ -91,6 +91,7 @@ def reinforce(env, policy_model, seed, learning_rate,
             policy.append(state)
             #print(done)
             if done:
+                env.render()
                 returns = compute_returns(scores, gamma)
                 #this section is from https://gist.github.com/cyoon1729/3920da556f992909ace8516e2f321a7c#file-reinforce_update-py
                 #this part does the learning
@@ -102,21 +103,52 @@ def reinforce(env, policy_model, seed, learning_rate,
                 #back propagation
                 policyGrad.backward()
                 policy_model.optimizer.step()
+                #print(score)
                 allScores.append(sum(scores) / len(scores))
                 break
             state = nextState['glyphs']
     return policy, allScores
 
+def makeEnv():
+    MOVE_ACTIONS = tuple(nethack.CompassDirection)
+    NAVIGATE_ACTIONS = MOVE_ACTIONS + (
+        nethack.Command.OPEN,
+        nethack.Command.SEARCH,
+        nethack.Command.LOOK, 
+        #nethack.Command.LOOT, 
+        nethack.Command.PICKUP,
+        nethack.Command.WIELD, 
+        nethack.Command.SWAP,
+        nethack.Command.ENGRAVE,
+        nethack.Command.ZAP
+        # Might need more? All actions and descriptions found here
+        # https://minihack.readthedocs.io/en/latest/getting-started/action_spaces.html
+    )
+
+    # Create env with modified actions
+    # Probably can limit the observations as well
+    env = gym.make(
+        "MiniHack-Quest-Hard-v0",
+        observation_keys=("glyphs", "chars", "colors", "pixel","screen_descriptions"),
+        actions=NAVIGATE_ACTIONS,
+        reward_lose=-100,
+        reward_win=20,
+        penalty_step=-0.01
+    )
+    #env.seed(hyper_params["seed"])
+    return env
+
 def run_reinforce():
-    env = gym.make("MiniHack-Quest-Easy-v0",observation_keys=("glyphs", "chars", "colors", "pixel","screen_descriptions"),)
+    env = makeEnv()
+    print("number of actions: ",env.action_space)
     #print(env.observation_space['glyphs'])
     #deimension of game space
     size = 21 * 79
-    policy_model = SimplePolicy(s_size=size, h_size=128, a_size=env.action_space.n)
+    policy_model = SimplePolicy(s_size=size, h_size=size, a_size=env.action_space.n)
     policy, scores = reinforce(env=env, policy_model=policy_model, seed=42, learning_rate=1e-2,
-                               number_episodes=50,
+                               number_episodes=500,
                                max_episode_length=10000,
-                               gamma=0.9,
+                               gamma=1.0,
                                verbose=True)
     # Plot learning curve
     #gamma = 1.0
