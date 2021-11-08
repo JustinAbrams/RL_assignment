@@ -209,14 +209,42 @@ class DQNAgent:
             return action.item()
 
 #===================================================================================================
+#==============================================Events===============================================
+#===================================================================================================
+import minihack
+from minihack import RewardManager
+np.set_printoptions(threshold=np.inf)
+
+class ExploreEvent(minihack.reward_manager.Event):
+    def __init__(self, reward: float, repeatable: bool, terminal_required: bool, terminal_sufficient: bool):
+        super().__init__(reward, repeatable, terminal_required, terminal_sufficient)
+
+    def check(self, env, previous_observation, action, observation) -> float:
+        # blank spots are 32
+        # agent is 64
+        # agent spawn point is 60
+        # pathways are 35
+        # obs[1] is the char observation 
+        # print("+++++++++++++++++++\nobs = \n++++++++++++++++++++++\n", observation[1])
+        current = sum(np.count_nonzero(i == 35) for i in observation[1])
+        current += sum(np.count_nonzero(i == 60) for i in observation[1])
+        prev = sum(np.count_nonzero(i == 35) for i in previous_observation[1])
+        prev += sum(np.count_nonzero(i == 60) for i in previous_observation[1])
+        if current > prev:
+            return self.reward
+        else:
+            return 0
+
+
+
+#===================================================================================================
 #==============================================Training=============================================
 #===================================================================================================
 
 import random
 import numpy as np
+
 import gym
-import minihack
-from minihack import RewardManager
 from nle import nethack
 import argparse
 import time
@@ -326,13 +354,13 @@ def create_env():
     MOVE_ACTIONS = tuple(nethack.CompassDirection)
     NAVIGATE_ACTIONS = MOVE_ACTIONS + (
         nethack.Command.OPEN,   # Not sure if needed
-        nethack.Command.PICKUP, # Not sure if needed
-        nethack.Command.WEAR,   # Not sure if needed
-        nethack.Command.WIELD,  # Not sure if needed
+        nethack.Command.PICKUP, 
+        nethack.Command.WEAR,   
+        nethack.Command.WIELD,  
         nethack.Command.QUAFF,
         nethack.Command.INVOKE,
         nethack.Command.ZAP,
-        nethack.Command.SWAP,
+        nethack.Command.SWAP,   # Not sure if needed
 
         # Might need more? All actions and descriptions found here
         # https://minihack.readthedocs.io/en/latest/getting-started/action_spaces.html
@@ -342,7 +370,9 @@ def create_env():
     reward_manager.add_kill_event("minotaur", reward=5, terminal_required=False)
     strings = list()
     strings.append("The door opens.")
-    reward_manager.add_message_event(strings, reward=2, terminal_required=True)
+    reward_manager.add_message_event(strings, reward=20, terminal_required=True)
+
+    reward_manager.add_event(ExploreEvent(0.01, True, True, False))
 
     # Create env with modified actions
     # Probably can limit the observations as well
