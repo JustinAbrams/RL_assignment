@@ -264,6 +264,9 @@ def train(env, agent):
 
         num_episodes = len(e_rewards)
 
+        if done:
+            print("Episode:", str(num_episodes))
+
         if (
             done
             and hyper_params["print-freq"] is not None
@@ -335,10 +338,11 @@ def create_env():
         # https://minihack.readthedocs.io/en/latest/getting-started/action_spaces.html
     )
 
-    RewardManager().add_kill_event("minotaur", reward=5, terminal_required=False)
+    reward_manager = RewardManager()
+    reward_manager.add_kill_event("minotaur", reward=5, terminal_required=False)
     strings = list()
     strings.append("The door opens.")
-    RewardManager().add_message_event(strings, reward=2, terminal_required=False)
+    reward_manager.add_message_event(strings, reward=2, terminal_required=True)
 
     # Create env with modified actions
     # Probably can limit the observations as well
@@ -347,9 +351,9 @@ def create_env():
         actions=NAVIGATE_ACTIONS,
         reward_lose=-2,
         reward_win=2,
-        reward_manager=RewardManager()
+        reward_manager=reward_manager
     )
-    
+
     env.seed(hyper_params["seed"])
     return env
 
