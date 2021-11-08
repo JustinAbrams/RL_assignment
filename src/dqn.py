@@ -285,7 +285,7 @@ def train(env, agent):
             agent.save("model" + str(len(e_rewards)))
 
 
-def test(env, agent):
+def test(env, agent, random=False):
     s = env.reset()['glyphs']
     s = s.flatten()
     episode_count = 0
@@ -295,7 +295,10 @@ def test(env, agent):
 
         time.sleep(0.2)
         env.render()
-        a = agent.act(s)
+        if random:
+            a = env.action_space.sample()
+        else:
+            a = agent.act(s)
 
         print("Episode:", str(episode_count), "\tTime step:", str(t),  "\tAction Taken:", str(a))
         print("Current Episode Reward:", str(reward_for_episode))
@@ -332,11 +335,10 @@ def create_env():
         # https://minihack.readthedocs.io/en/latest/getting-started/action_spaces.html
     )
 
-    # rewards = RewardManager()
-    # rewards.add_kill_event("minotaur", reward=5, terminal_required=False)
-    # strings = list()
-    # strings.append("The door opens.")
-    # rewards.add_message_event(strings, reward=2, terminal_required=False)
+    RewardManager().add_kill_event("minotaur", reward=5, terminal_required=False)
+    strings = list()
+    strings.append("The door opens.")
+    RewardManager().add_message_event(strings, reward=2, terminal_required=False)
 
     # Create env with modified actions
     # Probably can limit the observations as well
@@ -345,8 +347,9 @@ def create_env():
         actions=NAVIGATE_ACTIONS,
         reward_lose=-2,
         reward_win=2,
-        # reward_manager=rewards
+        reward_manager=RewardManager()
     )
+    
     env.seed(hyper_params["seed"])
     return env
 
@@ -393,6 +396,10 @@ if __name__ == "__main__":
                        type=str,
                        help='test a model')
 
+    my_parser.add_argument('-random',
+                       action="store_true",
+                       help='test a random model')
+
     # Execute the parse_args() method
     args = my_parser.parse_args()
 
@@ -431,7 +438,9 @@ if __name__ == "__main__":
         env = create_env()
         agent = create_agent(testing_only=True, model_dir=args.test)
         test(env, agent)
-
+    elif args.random:
+        env = create_env()
+        test(env, None, random=True)
     else:
         env = create_env()
         agent = create_agent(input_size, env.action_space.n)
