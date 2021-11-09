@@ -87,8 +87,8 @@ def reinforce(env, policy_model, seed, learning_rate,
         scores = []
 
         for steps in range(max_episode_length):
-            #This displays the last 3 episodes
-            if episode > number_episodes - 4:
+            #This displays the last 1 episodes
+            if episode > number_episodes - 2:
                 env.render()
             state = torch.from_numpy(state).float().unsqueeze(0).to(device)
             #this section is from https://gist.github.com/cyoon1729/bc41d466b868ea10e794a7c04321ff3b#file-reinforce_model-py
@@ -170,8 +170,8 @@ def reinforce_naive_baseline(env, policy_model, state_model, seed, learning_rate
         scores = []
         states = []
         for steps in range(max_episode_length):
-            #This displays the last 3 episodes
-            if episode > number_episodes - 4:
+            #This displays the last 1 episodes
+            if episode > number_episodes - 2:
                 env.render()
             state = torch.from_numpy(state).float().unsqueeze(0).to(device)
             #this section is from https://gist.github.com/cyoon1729/bc41d466b868ea10e794a7c04321ff3b#file-reinforce_model-py
@@ -233,7 +233,7 @@ def reinforce_naive_baseline(env, policy_model, state_model, seed, learning_rate
 
 def run_reinforce():
     global num_epi
-    num_epi = 100
+    num_epi = 400
     env = gym.make('CartPole-v1')
     env._max_episode_steps = 500
     np.random.seed(53)
