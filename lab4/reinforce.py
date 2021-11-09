@@ -8,7 +8,7 @@ import torch.nn.functional as Func
 import random
 from torch.autograd import Variable
 from collections import deque
-
+import pandas as pd
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
@@ -254,8 +254,6 @@ def run_reinforce():
     #max_episode_length=1000
     #h_size=50
 def investigate_variance_in_reinforce(baselineScore, reinforceScore):
-    env = gym.make('CartPole-v1')
-    seeds = np.random.randint(1000, size=5)
     baselineScorePosi = np.std(baselineScore, axis=0) + baselineScore
     baselineScoreNega =  - np.std(baselineScore, axis=0) + baselineScore
     reinforceScorePosi = np.std(reinforceScore, axis=0) + reinforceScore
@@ -266,7 +264,10 @@ def investigate_variance_in_reinforce(baselineScore, reinforceScore):
     plt.plot(reinforceScore)
     #plt.plot(reinforceScorePosi)
     #plt.plot(reinforceScoreNega)
-    plt.legend(['Baseline', 'Reinforce'], loc='upper left')
+    plt.xlabel("Episode")
+    plt.ylabel("Score")
+    plt.title("Reinforce and reinforce with baeline averaged over 5 seeds")
+    plt.legend(['Reinforce with Baseline', 'Reinforce'], loc='upper left')
     plt.show()
     #raise NotImplementedError
 
@@ -298,12 +299,38 @@ def run_reinforce_with_naive_baseline():
     return allScores, arr
     #raise NotImplementedError
 
+def plot_graph_with_std(reinforceScores):
+    reinforceScorePosi = np.std(reinforceScores, axis=0) + reinforceScores
+    reinforceScoreNega = - np.std(reinforceScores, axis=0) + reinforceScores
+    plt.plot(reinforceScore)
+    plt.plot(reinforceScorePosi)
+    plt.plot(reinforceScoreNega)
+    plt.xlabel("Episode")
+    plt.ylabel("Score")
+    plt.title("Reinforce averaged over 5 seeds with std positive and negative")
+    plt.legend(['Reinforce', 'Reinforce std positive', 'Reinforce std negative'], loc='upper left')
+    plt.show()
+
+def plot_curve_w_moving_avg(reinforceScores):
+    d = pd.Series(reinforceScores)
+
+    #print(d.rolling(50).mean())
+    reinforceSRoll = np.array(d.rolling(50).mean())
+    plt.plot(reinforceScores)
+    plt.plot(reinforceSRoll)
+    plt.xlabel("Episode")
+    plt.ylabel("Score")
+    plt.title("Reinforce learning curve")
+    plt.legend(['Reinforce','Rolling average of 50'], loc='upper left')
+    plt.show()
 
 if __name__ == '__main__':
     mean = 0
     std = 0
-    baselineScores, baselineScore = run_reinforce_with_naive_baseline()
     reinforceScores, reinforceScore = run_reinforce()
+    plot_graph_with_std(reinforceScores)
+    plot_curve_w_moving_avg(reinforceScore)
+    baselineScores, baselineScore = run_reinforce_with_naive_baseline()
     investigate_variance_in_reinforce(baselineScores, reinforceScores)
     #mean, std = investigate_variance_in_reinforce()
 
