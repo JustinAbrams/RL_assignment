@@ -60,7 +60,7 @@ def compute_returns(rewards, gamma):
             Gt = Gt + gamma ** pw * r
             pw = pw + 1
         returns.append(Gt)
-    returns = torch.tensor(returns)
+    returns = torch.tensor(returns).to(device)
     returns = (returns - returns.mean()) / (
             returns.std())
     return returns
@@ -72,7 +72,7 @@ def reinforce(env, policy_model, seed, learning_rate,
               gamma, verbose=True):
     # set random seeds (for reproducibility)
     torch.manual_seed(seed)
-    #torch.cuda.manual_seed_all(seed)
+    torch.cuda.manual_seed_all(seed)
     np.random.seed(seed)
     random.seed(seed)
 
@@ -87,9 +87,10 @@ def reinforce(env, policy_model, seed, learning_rate,
         scores = []
 
         for steps in range(max_episode_length):
-            # you can uncomment this to display cart
-            # env.render()
-            state = torch.from_numpy(state).float().unsqueeze(0)
+            #This displays the last 3 episodes
+            if episode > number_episodes - 4:
+                env.render()
+            state = torch.from_numpy(state).float().unsqueeze(0).to(device)
             #this section is from https://gist.github.com/cyoon1729/bc41d466b868ea10e794a7c04321ff3b#file-reinforce_model-py
             probs = policy_model.forward(Variable(state))
             action = np.random.choice(env.action_space.n, p=np.squeeze(probs.detach().numpy()))
@@ -114,7 +115,7 @@ def reinforce(env, policy_model, seed, learning_rate,
                 avgNumsteps.append(np.mean(numsteps[-10:]))
                 allRewards.append(np.sum(scores))
                 if episode % 1 == 0:
-                    print("episode: {}, total reward: {}, average_reward: {}, length: {}".format(episode,np.round(
+                    print(" Reinforce -> episode: {}, total reward: {}, average_reward: {}, length: {}".format(episode,np.round(
                                                                                                                   np.sum(
                                                                                                                       scores),
                                                                                                                   decimals=3),
@@ -138,7 +139,7 @@ def compute_returns_naive_baseline(rewards, gamma):
         for r in rewards[t:]:
             Gt = Gt * gamma + r
         returns.append(Gt)
-    returns = torch.tensor(returns)
+    returns = torch.tensor(returns).to(device)
     returns = (returns - returns.mean()) / (
         returns.std())
     return returns
@@ -154,7 +155,7 @@ def reinforce_naive_baseline(env, policy_model, state_model, seed, learning_rate
     env.seed(seed)
     # set random seeds (for reproducibility)
     torch.manual_seed(seed)
-    # torch.cuda.manual_seed_all(seed)
+    torch.cuda.manual_seed_all(seed)
     np.random.seed(seed)
     random.seed(seed)
 
@@ -169,9 +170,10 @@ def reinforce_naive_baseline(env, policy_model, state_model, seed, learning_rate
         scores = []
         states = []
         for steps in range(max_episode_length):
-            #you can uncomment this to display cart
-            #env.render()
-            state = torch.from_numpy(state).float().unsqueeze(0)#.to(device)
+            #This displays the last 3 episodes
+            if episode > number_episodes - 4:
+                env.render()
+            state = torch.from_numpy(state).float().unsqueeze(0).to(device)
             #this section is from https://gist.github.com/cyoon1729/bc41d466b868ea10e794a7c04321ff3b#file-reinforce_model-py
             probs = policy_model.forward(Variable(state))
             action = np.random.choice(env.action_space.n, p=np.squeeze(probs.detach().numpy()))
@@ -196,7 +198,7 @@ def reinforce_naive_baseline(env, policy_model, state_model, seed, learning_rate
                 deltas = []
                 for gt, val in zip(returns, stateValues):
                     deltas.append(gt-val)
-                deltas = torch.tensor(deltas)#.to(device)
+                deltas = torch.tensor(deltas).to(device)
                 #this section is where we calculate the policy gradient
                 #this section is from https://gist.github.com/cyoon1729/3920da556f992909ace8516e2f321a7c#file-reinforce_update-py
                 policyGrad = []
@@ -213,7 +215,7 @@ def reinforce_naive_baseline(env, policy_model, state_model, seed, learning_rate
                 allRewards.append(np.sum(scores))
                 if episode % 1 == 0:
                     print(
-                        "episode: {}, total reward: {}, average_reward: {}, length: {}".format(episode, np.round(
+                        "Reinforce with baseline -> episode: {}, total reward: {}, average_reward: {}, length: {}".format(episode, np.round(
                             np.sum(
                                 scores),
                             decimals=3),
@@ -230,17 +232,19 @@ def reinforce_naive_baseline(env, policy_model, state_model, seed, learning_rate
 
 
 def run_reinforce():
+    global num_epi
+    num_epi = 110
     env = gym.make('CartPole-v1')
     env._max_episode_steps = 500
     np.random.seed(53)
     seeds = np.random.randint(50, size=5)
     size = seeds.shape[0]
-    allScores = np.zeros(150)
+    allScores = np.zeros(num_epi)
     for i in seeds:
         #env.seed(0)
-        policy_model = SimplePolicy(s_size=env.observation_space.shape[0], h_size=50, a_size=env.action_space.n)
+        policy_model = SimplePolicy(s_size=env.observation_space.shape[0], h_size=50, a_size=env.action_space.n).to(device)
         policy, scores = reinforce(env=env, policy_model=policy_model, seed=42, learning_rate=1e-2,
-                                   number_episodes=150,
+                                   number_episodes=num_epi,
                                    max_episode_length=1000,
                                    gamma=0.99,
                                    verbose=True)
@@ -275,20 +279,21 @@ def investigate_variance_in_reinforce(baselineScore, reinforceScore):
 
 
 def run_reinforce_with_naive_baseline():
+    global num_epi
+    #num_epi = 100
     env = gym.make('CartPole-v1')
     env._max_episode_steps = 500
     np.random.seed(53)
     seeds = np.random.randint(50, size=5)
     size = seeds.shape[0]
     print(seeds)
-    allScores = np.zeros(150)
+    allScores = np.zeros(num_epi)
     for i in seeds:
-        print(i)
         #env.seed(0)
-        policy_model = SimplePolicy(s_size=env.observation_space.shape[0], h_size=50, a_size=env.action_space.n)#.to(device)
-        stateval_model = StateValueNetwork(s_size=env.observation_space.shape[0], h_size=50)#.to(device)
+        policy_model = SimplePolicy(s_size=env.observation_space.shape[0], h_size=50, a_size=env.action_space.n).to(device)
+        stateval_model = StateValueNetwork(s_size=env.observation_space.shape[0], h_size=50).to(device)
         policy, scores = reinforce_naive_baseline(env=env, policy_model=policy_model, state_model=stateval_model, seed=42, learning_rate=1e-2,
-                                   number_episodes=150,
+                                   number_episodes=num_epi,
                                    max_episode_length=1000,
                                    gamma=0.99,
                                    verbose=True)
