@@ -15,7 +15,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 class SimplePolicy(nn.Module):
     def __init__(self, s_size=4, h_size=16, a_size=2):
         super(SimplePolicy, self).__init__()
-        learning_rate = 0.01
+        learning_rate = 1e-2
         self.num_actions = a_size
         self.linear1 = nn.Linear(s_size, h_size)
         self.linear2 = nn.Linear(h_size, self.num_actions)
@@ -31,7 +31,7 @@ class StateValueNetwork(nn.Module):
     # Takes in state
     def __init__(self, s_size=4, h_size=16):
         super(StateValueNetwork, self).__init__()
-        learning_rate = 0.01
+        learning_rate = 1e-2
         self.linear1 = nn.Linear(s_size, h_size)
         self.linear2 = nn.Linear(h_size, 1)
         self.optimizer = torch.optim.Adam(self.parameters(), lr=learning_rate)
@@ -233,7 +233,7 @@ def reinforce_naive_baseline(env, policy_model, state_model, seed, learning_rate
 
 def run_reinforce():
     global num_epi
-    num_epi = 110
+    num_epi = 100
     env = gym.make('CartPole-v1')
     env._max_episode_steps = 500
     np.random.seed(53)
