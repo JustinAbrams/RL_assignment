@@ -225,10 +225,10 @@ def makeEnv():
         # https://minihack.readthedocs.io/en/latest/getting-started/action_spaces.html
     )
     reward_gen = RewardManager()
-    reward_gen.add_kill_event("minotaur", reward=100)
-    reward_gen.add_kill_event("goblin", reward=10)
-    reward_gen.add_kill_event("jackal", reward=10)
-    reward_gen.add_kill_event("giant rat", reward=10)
+    reward_gen.add_kill_event("minotaur", reward=10)
+    reward_gen.add_kill_event("goblin", reward=2)
+    reward_gen.add_kill_event("jackal", reward=2)
+    reward_gen.add_kill_event("giant rat", reward=2)
     strings = list()
     strings.append("The door opens.")
     reward_gen.add_message_event(strings, reward=2)
@@ -239,8 +239,8 @@ def makeEnv():
         hyper_params["env-name"],
         observation_keys=("glyphs", "chars", "colors", "pixel","screen_descriptions", "pixel_crop"),
         actions=NAVIGATE_ACTIONS,
-        reward_lose=-2,
-        reward_win=1000,
+        reward_lose=-5,
+        reward_win=10,
         penalty_step = -0.002,
         penalty_time = 0.002,
         reward_manager=reward_gen,
