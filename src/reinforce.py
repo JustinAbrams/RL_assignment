@@ -101,7 +101,7 @@ def learning(states ,scores, state_model, policy_model, lProbs, env, gamma):
 def reinforce_naive_baseline(env, policy_model, state_model, seed,
                              number_episodes,
                              max_episode_length,
-                             gamma, learning_rate, verbose=True):
+                             gamma, verbose=True):
     global hyper_params
     # set random seeds (for reproducibility)
     torch.manual_seed(hyper_params['seed'])
@@ -175,7 +175,6 @@ def makeEnv():
     reward_gen.add_kill_event("jackal", reward=10)
     reward_gen.add_kill_event("giant rat", reward=10)
     #reward_gen.add_wield_event("wand", reward=2)
-    #reward_gen.add_kill_event("giant rat", reward=2)
     strings = list()
     strings.append("The door opens.")
     reward_gen.add_message_event(strings, reward=2)
@@ -209,7 +208,7 @@ def run_reinforce():
     policy, scores = reinforce_naive_baseline(env=env, policy_model=policy_model, state_model=stateval_model, seed=42,
                                number_episodes=num_epi,
                                max_episode_length=hyper_params['num-steps'],
-                               gamma=hyper_params['discount-factor'], learning_rate=0.001,
+                               gamma=hyper_params['discount-factor'],
                                verbose=True)
     # Plot learning curve
     plt.plot(scores,'o')
@@ -226,7 +225,7 @@ if __name__ == '__main__':
         "replay-buffer-size": int(5e3),  # replay buffer size
         "learning-rate": 1e-4,  # learning rate for Adam optimizer
         "discount-factor": 0.99,  # discount factor
-        "num-steps": int(5e6),  # total number of steps to run the environment for
+        "num-steps": int(1000),  # total number of steps to run the environment for
         "batch-size": 256,  # number of transitions to optimize at the same time
         "learning-starts": 10000,  # number of steps before learning starts
         "learning-freq": 2,  # number of iterations between every optimization step
