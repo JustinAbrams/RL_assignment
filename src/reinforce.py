@@ -21,6 +21,7 @@ class SimplePolicy(nn.Module):
         super(SimplePolicy, self).__init__()
         self.linear1 = nn.Linear(s_size, h_size)
         self.linear2 = nn.Linear(h_size, a_size)
+        self.loss_fn=nn.CrossEntropyLoss()
         self.optimizer = torch.optim.Adam(self.parameters(), lr=learning_rate)
 
     def forward(self, x):
@@ -101,7 +102,7 @@ def learning(states ,scores, state_model, policy_model, lProbs, env, gamma):
 def reinforce_naive_baseline(env, policy_model, state_model, seed,
                              number_episodes,
                              max_episode_length,
-                             gamma, learning_rate, verbose=True):
+                             gamma, verbose=True):
     global hyper_params
     # set random seeds (for reproducibility)
     torch.manual_seed(hyper_params['seed'])
@@ -119,8 +120,6 @@ def reinforce_naive_baseline(env, policy_model, state_model, seed,
         scores = []
         states = []
         for steps in range(max_episode_length):
-            #This displays the last 1 episodes
-            #if episode > number_episodes - 2:
             #env.render()
             state = torch.from_numpy(state).float().unsqueeze(0).to(device)
             #this section is from https://gist.github.com/cyoon1729/bc41d466b868ea10e794a7c04321ff3b#file-reinforce_model-py
@@ -150,7 +149,6 @@ def reinforce_naive_baseline(env, policy_model, state_model, seed,
                                                                                                                       -10:]),
                                                                                                                   decimals=3),
                                                                                                       steps))
-                allRewards.append(np.sum(scores))
                 break
             state = nextState['glyphs']
     env.close()
@@ -231,8 +229,6 @@ def makeEnv():
     reward_gen.add_kill_event("goblin", reward=10)
     reward_gen.add_kill_event("jackal", reward=10)
     reward_gen.add_kill_event("giant rat", reward=10)
-    #reward_gen.add_wield_event("wand", reward=2)
-    #reward_gen.add_kill_event("giant rat", reward=2)
     strings = list()
     strings.append("The door opens.")
     reward_gen.add_message_event(strings, reward=2)
@@ -245,10 +241,10 @@ def makeEnv():
         actions=NAVIGATE_ACTIONS,
         reward_lose=-2,
         reward_win=1000,
-        penalty_step = -5,
-        penalty_time = 2,
+        penalty_step = -0.002,
+        penalty_time = 0.002,
         reward_manager=reward_gen,
-        max_episode_steps = 10000
+        max_episode_steps = hyper_params['num-steps']
     )
     env.seed(hyper_params["seed"])
     env = RenderRGB(env, pixel_obs)
@@ -263,13 +259,13 @@ def run_reinforce():
     #deimension of game space
     size = 21 * 79
     hSize = round(size/2)
-    num_epi = 100
+    num_epi = 10
     policy_model = SimplePolicy(s_size=size, h_size=hSize, a_size=env.action_space.n,learning_rate=hyper_params['learning-rate']).to(device)
     stateval_model = StateValueNetwork(s_size=size, h_size=hSize,learning_rate=hyper_params['learning-rate']).to(device)
     policy, scores = reinforce_naive_baseline(env=env, policy_model=policy_model, state_model=stateval_model, seed=42,
                                number_episodes=num_epi,
                                max_episode_length=hyper_params['num-steps'],
-                               gamma=hyper_params['discount-factor'], learning_rate=0.001,
+                               gamma=hyper_params['discount-factor'],
                                verbose=True)
     # Plot learning curve
     plt.plot(scores,'o')
@@ -286,7 +282,7 @@ if __name__ == '__main__':
         "replay-buffer-size": int(5e3),  # replay buffer size
         "learning-rate": 1e-4,  # learning rate for Adam optimizer
         "discount-factor": 0.99,  # discount factor
-        "num-steps": int(5e6),  # total number of steps to run the environment for
+        "num-steps": int(10000),  # total number of steps to run the environment for
         "batch-size": 256,  # number of transitions to optimize at the same time
         "learning-starts": 10000,  # number of steps before learning starts
         "learning-freq": 2,  # number of iterations between every optimization step
