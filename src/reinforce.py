@@ -1,4 +1,3 @@
-
 import sys
 import math
 import numpy as np
@@ -13,6 +12,7 @@ from torch.autograd import Variable
 from collections import deque
 from nle import nethack
 from minihack import RewardManager
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
@@ -70,7 +70,7 @@ def compute_returns_naive_baseline(rewards, gamma):
 
 def learning(states ,scores, state_model, policy_model, lProbs, env, gamma):
     returns = compute_returns_naive_baseline(scores, gamma)
-    env.render()
+    #env.render()
     #this section calculates the state values
     #calculate MSE loss
     stateValues = []
@@ -101,7 +101,7 @@ def learning(states ,scores, state_model, policy_model, lProbs, env, gamma):
 def reinforce_naive_baseline(env, policy_model, state_model, seed,
                              number_episodes,
                              max_episode_length,
-                             gamma, verbose=True):
+                             gamma, learning_rate, verbose=True):
     global hyper_params
     # set random seeds (for reproducibility)
     torch.manual_seed(hyper_params['seed'])
@@ -121,7 +121,7 @@ def reinforce_naive_baseline(env, policy_model, state_model, seed,
         for steps in range(max_episode_length):
             #This displays the last 1 episodes
             #if episode > number_episodes - 2:
-            env.render()
+            #env.render()
             state = torch.from_numpy(state).float().unsqueeze(0).to(device)
             #this section is from https://gist.github.com/cyoon1729/bc41d466b868ea10e794a7c04321ff3b#file-reinforce_model-py
             probs = policy_model.forward(Variable(state))
@@ -136,11 +136,68 @@ def reinforce_naive_baseline(env, policy_model, state_model, seed,
                 #learning(states, scores, state_model, policy_model, lProbs, env, gamma)
             if done:
                 learning(states, scores, state_model, policy_model, lProbs, env, gamma)
+                numsteps.append(steps)
+                avgNumsteps.append(np.mean(numsteps[-10:]))
+                allRewards.append(np.sum(scores))
+                if episode % 1 == 0:
+                    print("Reinforce with baseline -> episode: {}, total reward: {}, average_reward: {}, length: {}".format(episode,np.round(
+                                                                                                                  np.sum(
+                                                                                                                      scores),
+                                                                                                                  decimals=3),
+                                                                                                              np.round(
+                                                                                                                  np.mean(
+                                                                                                                      allRewards[
+                                                                                                                      -10:]),
+                                                                                                                  decimals=3),
+                                                                                                      steps))
                 allRewards.append(np.sum(scores))
                 break
             state = nextState['glyphs']
     env.close()
     return policy, allRewards
+import cv2
+cv2.ocl.setUseOpenCL(False)
+
+
+class RenderRGB(gym.Wrapper):
+    def __init__(self, env, key_name="pixel"):
+        super().__init__(env)
+        self.last_pixels = None
+        self.viewer = None
+        self.key_name = key_name
+
+        render_modes = env.metadata['render.modes']
+        render_modes.append("rgb_array")
+        env.metadata['render.modes'] = render_modes
+
+    def step(self, action):
+        obs, reward, done, info = self.env.step(action)
+        self.last_pixels = obs[self.key_name]
+        return obs, reward, done, info
+
+    def render(self, mode="human", **kwargs):
+        img = self.last_pixels
+
+        # Hacky but works
+        if mode != "human":
+            return img
+        else:
+            from gym.envs.classic_control import rendering
+
+            if self.viewer is None:
+                self.viewer = rendering.SimpleImageViewer()
+            self.viewer.imshow(img)
+            return self.viewer.isopen
+
+    def reset(self):
+        obs = self.env.reset()
+        self.last_pixels = obs[self.key_name]
+        return obs
+
+    def close(self):
+        if self.viewer is not None:
+            self.viewer.close()
+            self.viewer = None
 
 def makeEnv():
     global hyper_params
@@ -175,14 +232,16 @@ def makeEnv():
     reward_gen.add_kill_event("jackal", reward=10)
     reward_gen.add_kill_event("giant rat", reward=10)
     #reward_gen.add_wield_event("wand", reward=2)
+    #reward_gen.add_kill_event("giant rat", reward=2)
     strings = list()
     strings.append("The door opens.")
     reward_gen.add_message_event(strings, reward=2)
     # Create env with modified actions
     # Probably can limit the observations as well
+    pixel_obs = "pixel_crop"
     env = gym.make(
         hyper_params["env-name"],
-        observation_keys=("glyphs", "chars", "colors", "pixel","screen_descriptions"),
+        observation_keys=("glyphs", "chars", "colors", "pixel","screen_descriptions", "pixel_crop"),
         actions=NAVIGATE_ACTIONS,
         reward_lose=-2,
         reward_win=1000,
@@ -192,6 +251,8 @@ def makeEnv():
         max_episode_steps = 10000
     )
     env.seed(hyper_params["seed"])
+    env = RenderRGB(env, pixel_obs)
+    env = gym.wrappers.Monitor(env, "recordings", force=True)
     return env
 
 def run_reinforce():
@@ -202,13 +263,13 @@ def run_reinforce():
     #deimension of game space
     size = 21 * 79
     hSize = round(size/2)
-    num_epi = 200
+    num_epi = 100
     policy_model = SimplePolicy(s_size=size, h_size=hSize, a_size=env.action_space.n,learning_rate=hyper_params['learning-rate']).to(device)
     stateval_model = StateValueNetwork(s_size=size, h_size=hSize,learning_rate=hyper_params['learning-rate']).to(device)
     policy, scores = reinforce_naive_baseline(env=env, policy_model=policy_model, state_model=stateval_model, seed=42,
                                number_episodes=num_epi,
                                max_episode_length=hyper_params['num-steps'],
-                               gamma=hyper_params['discount-factor'],
+                               gamma=hyper_params['discount-factor'], learning_rate=0.001,
                                verbose=True)
     # Plot learning curve
     plt.plot(scores,'o')
@@ -225,7 +286,7 @@ if __name__ == '__main__':
         "replay-buffer-size": int(5e3),  # replay buffer size
         "learning-rate": 1e-4,  # learning rate for Adam optimizer
         "discount-factor": 0.99,  # discount factor
-        "num-steps": int(1000),  # total number of steps to run the environment for
+        "num-steps": int(5e6),  # total number of steps to run the environment for
         "batch-size": 256,  # number of transitions to optimize at the same time
         "learning-starts": 10000,  # number of steps before learning starts
         "learning-freq": 2,  # number of iterations between every optimization step
@@ -237,4 +298,3 @@ if __name__ == '__main__':
         "save-freq": 500, # number of iterations between each model save
     }
     run_reinforce()
-
