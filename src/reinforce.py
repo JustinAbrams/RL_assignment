@@ -115,7 +115,7 @@ def reinforce_naive_baseline(env, policy_model, state_model, seed,
     avgNumsteps = []
     allRewards = []
     for episode in range(number_episodes):
-        state = env.reset()['glyphs']
+        state = env.reset()['glyphs_crop']
         lProbs = []
         scores = []
         states = []
@@ -150,7 +150,7 @@ def reinforce_naive_baseline(env, policy_model, state_model, seed,
                                                                                                                   decimals=3),
                                                                                                       steps))
                 break
-            state = nextState['glyphs']
+            state = nextState['glyphs_crop']
     env.close()
     return policy, allRewards
 import cv2
@@ -231,13 +231,13 @@ def makeEnv():
     reward_gen.add_kill_event("giant rat", reward=1)
     strings = list()
     strings.append("The door opens.")
-    reward_gen.add_message_event(strings, reward=2)
+    reward_gen.add_message_event(strings, reward=1)
     # Create env with modified actions
     # Probably can limit the observations as well
     pixel_obs = "pixel_crop"
     env = gym.make(
         hyper_params["env-name"],
-        observation_keys=("glyphs", "chars", "colors", "pixel","screen_descriptions", "pixel_crop"),
+        observation_keys=("glyphs", "chars", "colors", "pixel","screen_descriptions", "pixel_crop","glyphs_crop"),
         actions=NAVIGATE_ACTIONS,
         reward_lose=-10,
         reward_win=10,
@@ -257,11 +257,11 @@ def run_reinforce():
     print("number of actions: ",env.action_space)
     #print(env.observation_space['glyphs'])
     #deimension of game space
-    size = 21 * 79
+    size = 9 * 9
     hSize = round(size/2)
     num_epi = 10
-    policy_model = SimplePolicy(s_size=size, h_size=hSize, a_size=env.action_space.n,learning_rate=hyper_params['learning-rate']).to(device)
-    stateval_model = StateValueNetwork(s_size=size, h_size=hSize,learning_rate=hyper_params['learning-rate']).to(device)
+    policy_model = SimplePolicy(s_size=size, h_size=size, a_size=env.action_space.n,learning_rate=hyper_params['learning-rate']).to(device)
+    stateval_model = StateValueNetwork(s_size=size, h_size=size,learning_rate=hyper_params['learning-rate']).to(device)
     policy, scores = reinforce_naive_baseline(env=env, policy_model=policy_model, state_model=stateval_model, seed=42,
                                number_episodes=num_epi,
                                max_episode_length=hyper_params['num-steps'],
@@ -282,7 +282,7 @@ if __name__ == '__main__':
         "replay-buffer-size": int(5e3),  # replay buffer size
         "learning-rate": 1e-4,  # learning rate for Adam optimizer
         "discount-factor": 0.99,  # discount factor
-        "num-steps": int(10000),  # total number of steps to run the environment for
+        "num-steps": int(5000),  # total number of steps to run the environment for
         "batch-size": 256,  # number of transitions to optimize at the same time
         "learning-starts": 10000,  # number of steps before learning starts
         "learning-freq": 2,  # number of iterations between every optimization step
