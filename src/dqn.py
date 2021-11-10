@@ -21,13 +21,13 @@ class DQN(neuraln.Module):
         super().__init__()
 
         self.fc = neuraln.Sequential(
-            neuraln.Linear(in_features=input_size , out_features=1024),
+            neuraln.Linear(in_features=input_size , out_features=256),
             neuraln.ReLU(),
-            neuraln.Linear(in_features=1024 , out_features=512),
+            neuraln.Linear(in_features=256 , out_features=256),
             neuraln.ReLU(),
-            neuraln.Linear(in_features=512 , out_features=512),
+            neuraln.Linear(in_features=256 , out_features=128),
             neuraln.ReLU(),
-            neuraln.Linear(in_features=512, out_features=n_actions)
+            neuraln.Linear(in_features=128, out_features=n_actions)
         )
 
     def forward(self, x):
@@ -142,7 +142,7 @@ class DQNAgent:
             self.policy_network = DQN(input_size, n_actions).to(device)
             self.update_target_network()
             self.target_network.eval()
-            self.optimiser = torch.optim.RMSprop(self.policy_network.parameters(), lr=lr)        
+            self.optimiser = torch.optim.Adam(self.policy_network.parameters(), lr=lr)        
             self.device = device
         else:
             self.policy_network = torch.load(model_dir)    
@@ -213,7 +213,7 @@ class DQNAgent:
 #===================================================================================================
 import minihack
 from minihack import RewardManager
-np.set_printoptions(threshold=np.inf)
+# np.set_printoptions(threshold=np.inf)
 
 class ExploreEvent(minihack.reward_manager.Event):
     def __init__(self, reward: float, repeatable: bool, terminal_required: bool, terminal_sufficient: bool):
@@ -253,7 +253,7 @@ import torch
 def train(env, agent):
     eps_timesteps = hyper_params["eps-fraction"] * float(hyper_params["num-steps"])
     e_rewards = [0.0]
-    s = env.reset()['glyphs']
+    s = env.reset()['glyphs_crop']
     s = s.flatten()
     
     for t in range(hyper_params["num-steps"]):
@@ -268,13 +268,14 @@ def train(env, agent):
             a = env.action_space.sample()
 
         ns, reward, done, info = env.step(a)
-        ns = ns['glyphs'].flatten()
+        ns = ns['glyphs_crop'].flatten()
         agent.memory.add(s, a, reward, ns, float(done))
         s = ns
 
         e_rewards[-1] += reward
+
         if done:
-            s = env.reset()['glyphs']
+            s = env.reset()['glyphs_crop']
             s = s.flatten()
             e_rewards.append(0.0)
 
@@ -291,6 +292,8 @@ def train(env, agent):
             agent.update_target_network()
 
         num_episodes = len(e_rewards)
+
+        
 
         if done:
             print("Episode:", str(num_episodes))
@@ -315,16 +318,19 @@ def train(env, agent):
         ):
             agent.save("model" + str(len(e_rewards)))
 
+        
+
+
 
 def test(env, agent, random=False):
-    s = env.reset()['glyphs']
+    s = env.reset()['glyphs_crop']
     s = s.flatten()
     episode_count = 0
     reward_for_episode = 0
     prev_reward = 0
     for t in range(hyper_params["num-steps"]):
 
-        time.sleep(0.2)
+        time.sleep(0.02)
         env.render()
         if random:
             a = env.action_space.sample()
@@ -337,16 +343,61 @@ def test(env, agent, random=False):
 
         ns, reward, done, info = env.step(a)
         reward_for_episode += reward
-        ns = ns['glyphs'].flatten()
+        ns = ns['glyphs_crop'].flatten()
         s = ns
 
+        if (reward_for_episode < -200):
+            done = True
+
         if done:
-            s = env.reset()['glyphs']
+            s = env.reset()['glyphs_crop']
             s = s.flatten()
             episode_count += 1
             prev_reward = reward_for_episode
             reward_for_episode = 0
 
+
+import cv2
+cv2.ocl.setUseOpenCL(False)
+class RenderRGB(gym.Wrapper):
+    def __init__(self, env, key_name="pixel"):
+        super().__init__(env)
+        self.last_pixels = None
+        self.viewer = None
+        self.key_name = key_name
+
+        render_modes = env.metadata['render.modes']
+        render_modes.append("rgb_array")
+        env.metadata['render.modes'] = render_modes
+
+    def step(self, action):
+        obs, reward, done, info = self.env.step(action)
+        self.last_pixels = obs[self.key_name]
+        return obs, reward, done, info
+
+    def render(self, mode="human", **kwargs):
+        img = self.last_pixels
+
+        # Hacky but works
+        if mode != "human":
+            return img
+        else:
+            from gym.envs.classic_control import rendering
+
+            if self.viewer is None:
+                self.viewer = rendering.SimpleImageViewer()
+            self.viewer.imshow(img)
+            return self.viewer.isopen
+
+    def reset(self):
+        obs = self.env.reset()
+        self.last_pixels = obs[self.key_name]
+        return obs
+
+    def close(self):
+        if self.viewer is not None:
+            self.viewer.close()
+            self.viewer = None
 
 def create_env():
     global hyper_params
@@ -365,30 +416,39 @@ def create_env():
         # Might need more? All actions and descriptions found here
         # https://minihack.readthedocs.io/en/latest/getting-started/action_spaces.html
     )
+    pixel_obs = "pixel_crop"
 
     reward_manager = RewardManager()
-    reward_manager.add_kill_event("minotaur", reward=5, terminal_required=False)
+    reward_manager.add_kill_event("minotaur", reward=1, terminal_required=False)
     strings = list()
     strings.append("The door opens.")
-    reward_manager.add_message_event(strings, reward=20, terminal_required=True)
+    reward_manager.add_message_event(strings, reward=1, terminal_required=True)
 
-    reward_manager.add_event(ExploreEvent(0.01, True, True, False))
+    strings = list()
+    strings.append("It's solid stone.")
+    reward_manager.add_message_event("It's solid stone.", reward=-0.75, terminal_required=False, repeatable=True)
 
+    reward_manager.add_event(ExploreEvent(0.5, True, True, False))
+    
     # Create env with modified actions
     # Probably can limit the observations as well
     env = gym.make(
         hyper_params["env-name"],
+        observation_keys=("glyphs_crop", "chars", "colors", "pixel", "message", "blstats", pixel_obs),
         actions=NAVIGATE_ACTIONS,
-        reward_lose=-2,
-        reward_win=2,
+        reward_lose=-1,
+        reward_win=1,
         reward_manager=reward_manager
     )
 
     env.seed(hyper_params["seed"])
+    env = RenderRGB(env, pixel_obs)
+    env = gym.wrappers.Monitor(env, "recordings", force=True)
+
     return env
 
 
-def create_agent(input_size=1659, n_actions=12, testing_only=False, model_dir=""):
+def create_agent(input_size=81, n_actions=12, testing_only=False, model_dir=""):
     global hyper_params
     if testing_only:
         if (model_dir==""): 
@@ -441,19 +501,19 @@ if __name__ == "__main__":
         "seed": 42,  # which seed to use
         "env-name": "MiniHack-Quest-Hard-v0",  # name of the game
         "replay-buffer-size": int(5e3),  # replay buffer size
-        "learning-rate": 1e-4,  # learning rate for Adam optimizer
+        "learning-rate": 1e-3,  # learning rate for Adam optimizer
         "discount-factor": 0.99,  # discount factor
-        "num-steps": int(5e6),  # total number of steps to run the environment for
-        "batch-size": 256,  # number of transitions to optimize at the same time
+        "num-steps": int(1e6),  # total number of steps to run the environment for
+        "batch-size": 128,  # number of transitions to optimize at the same time
         "learning-starts": 10000,  # number of steps before learning starts
         "learning-freq": 2,  # number of iterations between every optimization step
         "use-double-dqn": True,  # use double deep Q-learning
         "target-update-freq": 1000,  # number of iterations between every target network update
         "eps-start": 1.0,  # e-greedy start threshold
-        "eps-end": 0.1,  # e-greedy end threshold
-        "eps-fraction": 0.2,  # fraction of num-steps
+        "eps-end": 0.01,  # e-greedy end threshold
+        "eps-fraction": 0.3,  # fraction of num-steps
         "print-freq": 25, # number of iterations between each print out
-        "save-freq": 500, # number of iterations between each model save
+        "save-freq": 100, # number of iterations between each model save
     }
 
     np.random.seed(hyper_params["seed"])
@@ -466,7 +526,8 @@ if __name__ == "__main__":
     replay_buffer = ReplayBuffer(hyper_params["replay-buffer-size"])
 
     # Glyphs are 21 by 79
-    input_size = 1659 # 21 * 79
+    # Glyphs_crop centered 9x9 around agent
+    input_size = 81 # 9*9
 
     if args.test:
         env = create_env()
